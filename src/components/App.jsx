@@ -1,103 +1,82 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import css from './App.module.css';
 
 import { Searchbar } from './Searchbar/Searchbar';
 import { ImageGallery } from './ImageGallery/ImageGallery';
 import { Modal } from './Modal/Modal';
-import { getImages } from 'services/api';
 import { Loader } from './Loader/Loader';
 import { Button } from './Button/Button';
 
-export class App extends Component {
-  state = {
-    searchQuery: '',
-    searchData: [],
-    error: null,
-    page: 1,
-    per_page: 12,
-    largeImgUrl: '',
-    isEmpty: false,
-    isLoading: false,
-    showBtn: false,
-  };
+import { getImages } from 'services/api';
 
-  async componentDidUpdate(_, prevState) {
-    const { searchQuery, page, per_page } = this.state;
-    if (prevState.searchQuery !== searchQuery || prevState.page !== page) {
-      try {
-        this.setState({ isLoading: true });
-        const { hits, totalHits } = await getImages(searchQuery, page);
+export const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchData, setSearchData] = useState([]);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [largeImgUrl, setLargeImgUrl] = useState('');
+  const [isEmpty, setIsEmpty] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showBtn, setShowBtn] = useState(false);
+
+  useEffect(() => {
+    if (!searchQuery) {
+      return;
+    }
+    getImages(searchQuery, page)
+      .then(({ hits, totalHits }) => {
+        setIsLoading(true);
         if (hits.length === 0) {
-          this.setState({ isEmpty: true });
+          setIsEmpty(true);
           return;
         }
-        this.setState(prevState => ({
-          searchData: [...prevState.searchData, ...hits],
-          showBtn: page < Math.ceil(totalHits / per_page),
-        }));
-      } catch (error) {
-        this.setState({ error: error.message });
-      } finally {
-        this.setState({ isLoading: false });
-      }
-    }
-  }
-  onImageClick = largeImgUrl => {
-    this.setState({ largeImgUrl });
+        setSearchData(prevState => [...prevState, ...hits]);
+        setShowBtn(page < Math.ceil(totalHits / 12));
+      })
+      .catch(error => setError(error.message))
+      .finally(() => setIsLoading(false));
+  }, [page, searchQuery]);
+
+  const onImageClick = largeImgUrl => {
+    setLargeImgUrl(largeImgUrl);
   };
 
-  loadMoreImages = () => {
-    this.setState({ page: this.state.page + 1 });
+  const loadMoreImages = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  handleSubmit = searchQuery => {
-    this.setState({
-      searchQuery,
-      searchData: [],
-      error: null,
-      page: 1,
-      largeImgUrl: '',
-      isEmpty: false,
-      isLoading: false,
-      showBtn: false,
-    });
+  const handleSubmit = searchQuery => {
+    setSearchQuery(searchQuery);
+    setSearchData([]);
+    setError(null);
+    setPage(1);
+    setLargeImgUrl('');
+    setIsEmpty(false);
+    setIsLoading(false);
+    setShowBtn(false);
   };
 
-  render() {
-    const {
-      searchData,
-      searchQuery,
-      error,
-      isEmpty,
-      isLoading,
-      showBtn,
-      largeImgUrl,
-    } = this.state;
-    return (
-      <div className={css.app}>
-        <Searchbar onSubmit={this.handleSubmit} />
-        {searchData.length > 0 && (
-          <ImageGallery
-            searchData={searchData}
-            onImageClick={this.onImageClick}
-          />
-        )}
-        {isLoading && (
-          <div className={css.backdrop}>
-            <Loader />
-          </div>
-        )}
-        {isEmpty && (
-          <p className={css.text}>
-            Nothing was found by the request '{searchQuery}'.
-          </p>
-        )}
-        {error && <p className={css.text}>Something wrong! {error}</p>}
-        {showBtn && <Button loadMoreImages={this.loadMoreImages} />}
-        {largeImgUrl && (
-          <Modal onImageClick={this.onImageClick} largeImgUrl={largeImgUrl} />
-        )}
-      </div>
-    );
-  }
-}
+  return (
+    <div className={css.app}>
+      <Searchbar onSubmit={handleSubmit} />
+      {searchData.length > 0 && (
+        <ImageGallery searchData={searchData} onImageClick={onImageClick} />
+      )}
+      {isLoading && (
+        <div className={css.backdrop}>
+          <Loader />
+        </div>
+      )}
+      {isEmpty && (
+        <p className={css.text}>
+          Nothing was found by the request '{searchQuery}'.
+        </p>
+      )}
+      {error && <p className={css.text}>Something wrong! {error}</p>}
+      {showBtn && <Button loadMoreImages={loadMoreImages} />}
+      {largeImgUrl && (
+        <Modal onImageClick={onImageClick} largeImgUrl={largeImgUrl} />
+      )}
+    </div>
+  );
+};
